@@ -7,8 +7,9 @@ import numpy as np
 import cv2
 
 # استيراد مكتبات Grad-CAM
-from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam import GradCAMPlusPlus
 from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 # 1. إعداد الصفحة
 st.set_page_config(page_title="Plant Disease Detection", page_icon="🌿", layout="wide")
@@ -72,27 +73,38 @@ if uploaded_file is not None:
     predicted_class = class_names[predicted_idx.item()]
     confidence_percentage = confidence.item() * 100
     
-    # 7. تطبيق Grad-CAM
-    # تحديد الطبقة الأخيرة فـ ResNet50 (layer4) باش نشوفو أين خصائص ركز عليها الموديل
-    target_layers = [model.layer4[-1]]
+    # 7. تطبيق GradCAM++ لتفاصيل أدق
+    # نختارو layer3 بوحدها حيت كتشد التفاصيل الصغيرة (البقع)
+    target_layers = [model.layer3[-1]]
+    targets = [ClassifierOutputTarget(predicted_idx.item())]
     
-    # تهيئة الأداة
-    cam = GradCAM(model=model, target_layers=target_layers)
+    # استعمال GradCAM++
+    cam = GradCAMPlusPlus(model=model, target_layers=target_layers)
     
-    # توليد خريطة الحرارة (Heatmap)
-    grayscale_cam = cam(input_tensor=image_tensor, targets=None)[0, :]
+    # حيدنا aug_smooth و eigen_smooth باش ما يتخلطوش لينا البقع وتولي ضبابة
+    grayscale_cam = cam(input_tensor=image_tensor, targets=targets)[0, :]
     
-    # باش نلصقو الحرارة فوق الصورة، خصنا نصغرو الصورة الأصلية لـ 224x224 ونردوها كسر بين 0 و 1
-    resized_img = image.resize((224, 224))
-    img_array = np.array(resized_img, dtype=np.float32) / 255.0
+    # تصفية قوية: نخليو غير البلايص اللي الموديل متأكد منهم بنسبة 40% الفوق
+    threshold = 0.6
+    grayscale_cam[grayscale_cam < threshold] = 0
     
-    # دمج الصورة مع الخريطة الحرارية
-    visualization = show_cam_on_image(img_array, grayscale_cam, use_rgb=True)
+    # تلوين الخريطة الحرارية
+    heatmap = cv2.applyColorMap(np.uint8(255 * grayscale_cam), cv2.COLORMAP_JET)
+    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
     
-    # عرض الـ Heatmap فـ العمود الثاني
+    orig_img = np.array(image.resize((224, 224)))
+    
+    # دمج الألوان بوضوح
+    blended = cv2.addWeighted(heatmap, 0.6, orig_img, 0.4, 0)
+    
+    # القناع (Mask)
+    mask = (grayscale_cam > 0).astype(np.uint8)[:, :, np.newaxis]
+    final_visualization = blended * mask + orig_img * (1 - mask)
+    
+    # عرض الـ Heatmap
     with col2:
-        st.subheader("أماكن تركيز الموديل (Grad-CAM)")
-        st.image(visualization, use_container_width=True)
+        st.subheader("أماكن تركيز الموديل (GradCAM++)")
+        st.image(final_visualization, use_container_width=True)
     
     # 8. عرض النتيجة النهائية
     st.markdown("---") # خط فاصل
