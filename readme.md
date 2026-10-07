@@ -55,10 +55,6 @@ The application will automatically open in your default web browser at `http://l
 
 ## 📈 Results & Evaluation
 
-The fine-tuned ResNet50 model achieved an overall accuracy of **87%** on the validation set after 20 epochs.
+The fine-tuned ResNet50 model achieved an overall accuracy of **87%** on the validation set after 30 epochs.
 Detailed evaluation using a Confusion Matrix and Classification Report showed exceptional precision (>95%) in classes like *YellowLeaf Curl Virus* and *Bacterial Spot*. The integration of **GradCAM++** successfully resolved initial padding artifacts and spurious background correlations, ensuring the model's predictions are genuinely based on the biological symptoms of the leaves.
 
-## 🔮 Future Work
-
-* **Object Detection:** Transitioning from Image Classification to Object Detection using **YOLOv8** to draw precise bounding boxes around diseased lesions.
-* **AI Background Removal:** Integrating `rembg` into the data pipeline to automatically remove laboratory backgrounds from the PlantVillage dataset, forcing the model to focus purely on the plant's texture and symptoms.
